@@ -27,37 +27,49 @@ jobs:
         with:
           gradle-version: '8.7'
 
-      - name: Extract VoltFlow project
+      - name: Extract project
         run: |
           mkdir project
           unzip VoltFlow-Loki-Timeline-Android-Project.zip -d project
 
-      - name: Fix Java and Kotlin versions
+      - name: Fix animation code
         run: |
           python3 - <<'PY'
           from pathlib import Path
 
+          p = Path("project/app/src/main/java/com/voltflow/app/ChargingActivity.kt")
+          s = p.read_text()
+
+          old = "val y = cy + sin(t * Math.PI * 2 + i) * (1f - t) * 115f"
+          new = "val y = cy + sin(t * Math.PI * 2 + i).toFloat() * (1f - t) * 115f"
+
+          if old not in s:
+              raise SystemExit("Could not find animation line to fix")
+
+          p.write_text(s.replace(old, new, 1))
+          print("Animation code fixed!")
+
           p = Path("project/app/build.gradle.kts")
           s = p.read_text()
 
-          s = s.replace(
-              "android {",
-              """android {
-                  compileOptions {
-                      sourceCompatibility = JavaVersion.VERSION_17
-                      targetCompatibility = JavaVersion.VERSION_17
-                  }
-                  kotlinOptions {
-                      jvmTarget = "17"
-                  }
-              """,
-              1
-          )
-
-          p.write_text(s)
+          if "compileOptions" not in s:
+              s = s.replace(
+                  "android {",
+                  """android {
+                      compileOptions {
+                          sourceCompatibility = JavaVersion.VERSION_17
+                          targetCompatibility = JavaVersion.VERSION_17
+                      }
+                      kotlinOptions {
+                          jvmTarget = "17"
+                      }
+                  """,
+                  1
+              )
+              p.write_text(s)
           PY
 
-      - name: Build VoltFlow APK
+      - name: Build APK
         working-directory: project
         run: gradle assembleDebug
 
